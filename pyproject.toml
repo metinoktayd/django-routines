@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "django-routines-tr"
+version = "1.0.1"
+description = "Reusable Django routines: middleware and i18n helpers."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Metin Oktay DENİZ" }]
+dependencies = ["Django>=5.2"]
+
+[project.urls]
+Homepage = "https://github.com/metinoktayd/django-routines"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/django_routines"]
