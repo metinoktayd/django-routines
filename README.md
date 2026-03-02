@@ -186,7 +186,8 @@ from django_routines.i18n.slugify import coklu_slugify
 
 class Blog(models.Model):
     isim = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255, unique=True, blank=True, null=True)
+    # allow_unicode=True → Arapça ve diğer Unicode alfabelerde slug üretimini destekler
+    slug = models.SlugField(max_length=255, unique=True, blank=True, null=True, allow_unicode=True)
 
     def save(self, *args, **kwargs):
         coklu_dil_slug_uygula(
