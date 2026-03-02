@@ -27,7 +27,7 @@ def ratelimit_sinir(request, exception=None):
     user = request.user if getattr(request, "user", None) and request.user.is_authenticated else None
 
     data = {
-        "event": "rate_limit_exceeded",
+        "event": "rate_limit_sinir",
         "ts": now().isoformat(),
         "ip": ip,
         "user_id": user.id if user else None,
