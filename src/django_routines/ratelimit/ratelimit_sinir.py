@@ -2,6 +2,7 @@ import json
 import logging
 from django.http import JsonResponse
 from django.utils.timezone import now
+from django.core.exceptions import PermissionDenied
 
 logger = logging.getLogger("security.ratelimit")
 
@@ -48,4 +49,4 @@ def ratelimit_sinir(request, exception=None):
 
     logger.warning(json.dumps(data, ensure_ascii=False))
 
-    return JsonResponse({"detail": "Too many requests"}, status=429)
+    raise PermissionDenied("Too many requests")
