@@ -1,5 +1,6 @@
 from django.conf import settings
 
+
 def coklu_dil_slug_uygula(nesne, baslik_alani="isim", slug_alani="slug", slugify_fonksiyonu=None):
     if not slugify_fonksiyonu:
         raise ValueError("slugify_fonksiyonu parametresi zorunludur")

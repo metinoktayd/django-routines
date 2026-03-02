@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "django-routines-tr"
-version = "1.1.4"
+version = "1.1.5"
 description = "Reusable Django routines: middleware and i18n helpers."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "Metin Oktay DENİZ" }]
-dependencies = ["Django>=5.2", "Pillow>=10.0", "django-ratelimit>=4.1.0", "redis>=6.4.0"]
+dependencies = ["Django>=5.2", "Pillow>=10.0", "django-ratelimit>=4.1.0", "redis>=6.4.0", "Unidecode>=1.4.0"]
 
 [project.urls]
 Homepage = "https://github.com/metinoktayd/django-routines"
