@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "django-routines-tr"
-version = "1.1.5"
+version = "1.1.8"
 description = "Reusable Django routines: middleware and i18n helpers."
 readme = "README.md"
 requires-python = ">=3.10"

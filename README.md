@@ -200,25 +200,35 @@ class Blog(models.Model):
 ```
 
 ---
-
-## redirect_to_correct_i18n_slug
-
-Aktif dile göre doğru slug alanını kontrol eder ve gerekirse doğru slug’a yönlendirme yapar.
-
+ 
+### slugdan_nesne_getir_veya_yonlendir
+ 
+**Slug üzerinden nesneyi bulur** ve gerekirse doğru dil slug'ına yönlendirir.
+ 
+Hangi dilde yazıldığı bilinmeyen bir slug ile geldiğinizde, tüm dil alanlarında arama yaparak nesneyi bulur.  
+Aktif dildeki slug farklıysa yönlendirme döndürür; doğruysa nesneyi döndürür.
+ 
+Kullanım senaryosu: Standart slug tabanlı URL yapısı. Slug'ı siz çekmiyorsunuz, URL'den doğrudan geliyor.
+ 
 ```python
-from django_routines import redirect_to_correct_i18n_slug
-
-response = redirect_to_correct_i18n_slug(
-    obj=article,
-    current_slug=slug,
-    url_name="article_detail",
-)
-
-if response:
-    return response
+from django_routines.i18n.slug_redirect import slugdan_nesne_getir_veya_yonlendir
+ 
+def makale_detay(request, slug):
+    nesne, redirect = slugdan_nesne_getir_veya_yonlendir(
+        model=Makale,
+        mevcut_slug=slug,
+        url_adi="makale-detay",
+    )
+    if redirect:
+        return redirect
+ 
+    return render(request, "makale_detay.html", {"makale": nesne})
 ```
 
+> Redirect varsa view içinde **önce redirect döndürülmelidir.**
+ 
 ---
+
 
 # Rate Limit Aşımı Loglama
 
@@ -262,7 +272,7 @@ MIDDLEWARE = [
 ### 2) Rate Limit Handler Tanımlayın
 
 ```python
-RATELIMIT_VIEW = "django_routines.ratelimit_sinir.ratelimit_exceeded"
+RATELIMIT_VIEW = "django_routines.ratelimit_sinir.ratelimit_sinir"
 ```
 
 ---
