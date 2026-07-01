@@ -56,9 +56,15 @@ def resim_sikistir(model_ornek, alan_adi, dosya_adi="resim", max_kb=200, max_ken
         if mevcut_isim.endswith(".webp"):
             return True
 
-        # 3) WEBP’e çevir ve hedef boyuta indir
         dosya = image_field.file
+        dosya.seek(0, 2)
+        mevcut_boyut_kb = dosya.tell() / 1024
         dosya.seek(0)
+
+        if mevcut_boyut_kb <= max_kb:
+            return True
+
+        # 3) WEBP’e çevir ve hedef boyuta indir
         resim = Image.open(dosya)
         resim = ImageOps.exif_transpose(resim)
 
@@ -67,7 +73,7 @@ def resim_sikistir(model_ornek, alan_adi, dosya_adi="resim", max_kb=200, max_ken
 
         genislik, yukseklik = resim.size
         en_buyuk = max(genislik, yukseklik)
-        if en_buyuk > max_kenar:
+        if max_kenar and en_buyuk > max_kenar:
             oran = max_kenar / float(en_buyuk)
             resim = resim.resize((int(genislik * oran), int(yukseklik * oran)), Image.LANCZOS)
 
