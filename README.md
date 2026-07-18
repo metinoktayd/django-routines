@@ -16,7 +16,7 @@ Dil yönlendirmesi, admin erişim kontrolü, çok dilli slug yönetimi, e-posta 
 - Alfabe otomatik tespitli `coklu_slugify` fonksiyonu  
 - E-posta ile giriş (authentication backend)  
 - Model ImageField görsellerini otomatik WEBP'e çevirme ve sıkıştırma yardımcı fonksiyonu  
-- Template'de dinamik görsel optimize etme (template filter)  
+- Template'de dinamik görsel optimize etme (template filter) - **Model ve Static dosya desteğiyle**  
 - django-ratelimit entegrasyonu ile detaylı rate limit aşımı loglama  
 
 ---
@@ -34,6 +34,29 @@ INSTALLED_APPS = [
     ...
     'django_routines',
 ]
+```
+
+**Statik dosyalar için gerekli ayarlar (`settings.py`):**
+
+```python
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+```
+
+**Ana proje `urls.py`'da:**
+
+```python
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('django_routines.urls')),  # ← EKLE
+]
+```
+
+**Statik dosyaları topla:**
+
+```bash
+python manage.py collectstatic --noinput
 ```
 
 Not:  
@@ -268,26 +291,34 @@ class Urun(models.Model):
 
 ### resim_optimize (Template Filter)
 
-Template'de görüntülenecek resimleri dinamik olarak optimize eder.
+Template'de görüntülenecek resimleri dinamik olarak optimize eder. **Hem Model ImageField'leri hem de Static dosyaları destekler.**
+
+**Özellikler:**
 
 - WEBP formatına çevirip sıkıştırır
 - İstenen genişlik ve kalite ayarlarını uygular
 - Base64 olarak inline eder (ek HTTP isteği yapılmaz)
 - Orijinal dosya boyutu korunur, sadece görüntülenecek versiyon optimize edilir
+- Model ImageField ve Static dosyalardan okuyan esnek yapı
 
 **Template'de kullanım:**
 
 ```html
 {% load resim_optimize %}
 
-<!-- Default: 2000px genişlik, kalite 85 -->
+<!-- Model ImageField - Default: 2000px genişlik, kalite 85 -->
 <img src="{{ product.image|resim_optimize }}" alt="Ürün">
 
-<!-- Custom: 106px genişlik, kalite 85 -->
+<!-- Model ImageField - Custom: 106px genişlik, kalite 85 -->
 <img src="{{ product.image|resim_optimize:'106:85' }}" alt="Ürün">
 
-<!-- Custom: 200px genişlik, kalite 90 -->
-<img src="{{ product.image|resim_optimize:'200:90' }}" alt="Ürün">
+<!-- Static dosya -->
+<img src="{{ 'images/logo.png'|resim_optimize:'200:90' }}" alt="Logo">
+
+<!-- Static dosya değişkenden -->
+{% with static_file='images/banner.jpg' %}
+    <img src="{{ static_file|resim_optimize:'1200:85' }}" alt="Banner">
+{% endwith %}
 ```
 
 **Format:** `genişlik:kalite`
@@ -300,7 +331,97 @@ Template'de görüntülenecek resimleri dinamik olarak optimize eder.
 ```
 ✓ Resim: urunler/urun1.jpg | İstenen: 106x85 | Orijinal: (2000, 2000) | Sonuç: 12.45KB
 ✓ Resim: urunler/urun2.jpg | İstenen: 200x90 | Orijinal: (1500, 1500) | Sonuç: 28.67KB
+✓ Resim: images/logo.png | İstenen: 200x90 | Orijinal: (800, 600) | Sonuç: 8.12KB
 ```
+
+---
+
+#### Filter Kodu
+
+```python
+from django import template
+from PIL import Image
+import base64
+from io import BytesIO
+from django.conf import settings
+import os
+
+register = template.Library()
+
+@register.filter
+def resim_optimize(image_path, params="2000:85"):
+    """
+    ImageField için:     {{ product.image|resim_optimize:"106:85" }}
+    Static dosyalar için: {{ 'urunler/resim.jpg'|resim_optimize:"106:85" }}
+    
+    Format: genişlik:kalite
+    """
+    if not image_path:
+        return ''
+    
+    try:
+        width, quality = params.split(':')
+        width = int(width)
+        quality = int(quality)
+    except (ValueError, AttributeError):
+        width = 2000
+        quality = 85
+    
+    try:
+        # ImageField mi yoksa string path mi kontrolü
+        if hasattr(image_path, 'path'):
+            # Django ImageField
+            dosya_path = image_path.path
+            dosya_adi = image_path.name
+        else:
+            # Static dosya string (örn: 'urunler/resim.jpg')
+            dosya_path = os.path.join(settings.STATIC_ROOT, str(image_path))
+            dosya_adi = str(image_path)
+        
+        # Dosya varsa kontrol et
+        if not os.path.exists(dosya_path):
+            print(f"✗ Dosya bulunamadı: {dosya_path}")
+            return ''
+        
+        img = Image.open(dosya_path)
+        orijinal_boyut = img.size
+        
+        # RGBA varsa RGB'ye çevir
+        if img.mode in ('RGBA', 'LA', 'P'):
+            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+            rgb_img.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = rgb_img
+        
+        # Yeniden boyutlandır
+        img.thumbnail((width, width), Image.Resampling.LANCZOS)
+        
+        # WEBP'ye kaydet
+        output = BytesIO()
+        img.save(output, format='WEBP', quality=quality, optimize=True)
+        
+        # Debug print
+        dosya_boyutu_kb = len(output.getvalue()) / 1024
+        print(f"✓ Resim: {dosya_adi} | İstenen: {width}x{quality} | Orijinal: {orijinal_boyut} | Sonuç: {dosya_boyutu_kb:.2f}KB")
+        
+        b64 = base64.b64encode(output.getvalue()).decode()
+        return f'data:image/webp;base64,{b64}'
+        
+    except Exception as e:
+        print(f"✗ Resim optimize hatası: {dosya_adi} | {e}")
+        return ''
+```
+
+---
+
+#### Önemli Not
+
+`collectstatic` komutunu çalıştırmayı unutmayın:
+
+```bash
+python manage.py collectstatic --noinput
+```
+
+Bu komut, statik dosyaları `STATIC_ROOT`'a kopyalar ve filter'ın çalışmasını sağlar.
 
 ---
 

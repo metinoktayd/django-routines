@@ -1,50 +1,53 @@
 from django import template
-from PIL import Image
-import base64
-from io import BytesIO
+from django.urls import reverse
+from django.conf import settings
 
-register = template.Library()
+kayit = template.Library()
 
-@register.filter
-def resim_optimize(image_field, params="2000:85"):
+@kayit.filter
+def resim_optimize(resim_yolu, parametreler="2000:85"):
     """
-    {{ product.image|optimize_image:"106:85" }}
+    URL tabanlı resim optimize etme filtresi.
+    
+    Kullanım:
+        {{ product.image|resim_optimize }}
+        {{ product.image|resim_optimize:"106:85" }}
+        {{ 'images/logo.png'|resim_optimize:"200:90" }}
+    
     Format: genişlik:kalite
     """
-    if not image_field:
+    if not resim_yolu:
         return ''
     
     try:
-        width, quality = params.split(':')
-        width = int(width)
-        quality = int(quality)
+        genislik, kalite = parametreler.split(':')
+        genislik = int(genislik)
+        kalite = int(kalite)
     except (ValueError, AttributeError):
-        width = 400
-        quality = 85
+        genislik = 2000
+        kalite = 85
     
     try:
-        img = Image.open(image_field.path)
-        orijinal_boyut = img.size
+        # ImageField mi yoksa string yolu mu kontrol et
+        if hasattr(resim_yolu, 'name'):
+            # Django ImageField
+            yol_metni = resim_yolu.name
+        else:
+            # String yolu
+            yol_metni = str(resim_yolu)
         
-        # RGBA varsa RGB'ye çevir
-        if img.mode in ('RGBA', 'LA', 'P'):
-            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
-            rgb_img.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-            img = rgb_img
+        # Optimize görünümüne yönlendir
+        optimize_url = reverse(
+            'django_routines:resim_optimize_et',
+            kwargs={
+                'resim_yolu': yol_metni,
+                'genislik': genislik,
+                'kalite': kalite
+            }
+        )
         
-        # Yeniden boyutlandır
-        img.thumbnail((width, width), Image.Resampling.LANCZOS)
+        return optimize_url
         
-        # WEBP'ye kaydet
-        output = BytesIO()
-        img.save(output, format='WEBP', quality=quality, optimize=True)
-        
-        # Türkçe debug print
-        dosya_boyutu_kb = len(output.getvalue()) / 1024
-        print(f"✓ Resim: {image_field.name} | İstenen: {width}x{quality} | Orijinal: {orijinal_boyut} | Sonuç: {dosya_boyutu_kb:.2f}KB")
-        
-        b64 = base64.b64encode(output.getvalue()).decode()
-        return f'data:image/webp;base64,{b64}'
     except Exception as e:
-        print(f"✗ Resim optimize hatası: {image_field.name} | {e}")
+        print(f"✗ Resim URL oluşturma hatası: {resim_yolu} | {e}")
         return ''
