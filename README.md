@@ -27,6 +27,15 @@ Dil yönlendirmesi, admin erişim kontrolü, çok dilli slug yönetimi, e-posta 
 pip install django-routines-tr
 ```
 
+Sonra `settings.py` dosyanıza `INSTALLED_APPS` kısmına ekleyin:
+
+```python
+INSTALLED_APPS = [
+    ...
+    'django_routines',
+]
+```
+
 Not:  
 Görsel sıkıştırma yardımcıları için `Pillow` gereklidir. Paket bağımlılıkları içinde otomatik kurulur.
 
