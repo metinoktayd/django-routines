@@ -2,30 +2,36 @@ from django import template
 from django.urls import reverse
 from django.conf import settings
 
-kayit = template.Library()
+register = template.Library()
 
-@kayit.filter
-def resim_optimize(resim_yolu, parametreler="2000:85"):
+@register.filter
+def resim_optimize(resim_yolu, parametreler="2000:100"):
     """
     URL tabanlı resim optimize etme filtresi.
-    
+
     Kullanım:
-        {{ product.image|resim_optimize }}
-        {{ product.image|resim_optimize:"106:85" }}
+        {{ product.image|resim_optimize }}             # 2000px, kalite 100
+        {{ product.image|resim_optimize:"106:85" }}     # 106px, kalite 85
+        {{ product.image|resim_optimize:"200:" }}       # 200px, kalite varsayılan (100)
+        {{ product.image|resim_optimize:":90" }}        # orijinal genişlik, kalite 90
         {{ 'images/logo.png'|resim_optimize:"200:90" }}
-    
-    Format: genişlik:kalite
+
+    Format: genişlik:kalite (ikisi de opsiyonel; boş bırakılan taraf
+    genişlik için orijinal boyutu, kalite için 100'ü kullanır)
     """
     if not resim_yolu:
         return ''
-    
+
     try:
-        genislik, kalite = parametreler.split(':')
-        genislik = int(genislik)
-        kalite = int(kalite)
-    except (ValueError, AttributeError):
-        genislik = 2000
-        kalite = 85
+        genislik_ham, _, kalite_ham = parametreler.partition(':')
+    except AttributeError:
+        genislik_ham, kalite_ham = '', ''
+
+    genislik_ham = genislik_ham.strip()
+    kalite_ham = kalite_ham.strip()
+
+    genislik = int(genislik_ham) if genislik_ham.isdigit() else 'orig'
+    kalite = int(kalite_ham) if kalite_ham.isdigit() else 100
     
     try:
         # ImageField mi yoksa string yolu mu kontrol et
@@ -49,5 +55,5 @@ def resim_optimize(resim_yolu, parametreler="2000:85"):
         return optimize_url
         
     except Exception as e:
-        print(f"✗ Resim URL oluşturma hatası: {resim_yolu} | {e}")
+        print(f"[HATA] Resim URL oluşturma hatası: {resim_yolu} | {e}")
         return ''

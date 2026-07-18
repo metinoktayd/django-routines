@@ -297,7 +297,7 @@ Template'de görüntülenecek resimleri dinamik olarak optimize eder. **Hem Mode
 
 - WEBP formatına çevirip sıkıştırır
 - İstenen genişlik ve kalite ayarlarını uygular
-- Base64 olarak inline eder (ek HTTP isteği yapılmaz)
+- **URL** döndürür; tarayıcı bu URL'e istek attığında görsel o an optimize edilip WEBP olarak servis edilir (1 yıllık `Cache-Control` ile)
 - Orijinal dosya boyutu korunur, sadece görüntülenecek versiyon optimize edilir
 - Model ImageField ve Static dosyalardan okuyan esnek yapı
 
@@ -306,11 +306,17 @@ Template'de görüntülenecek resimleri dinamik olarak optimize eder. **Hem Mode
 ```html
 {% load resim_optimize %}
 
-<!-- Model ImageField - Default: 2000px genişlik, kalite 85 -->
+<!-- Model ImageField - Default: 2000px genişlik, kalite 100 -->
 <img src="{{ product.image|resim_optimize }}" alt="Ürün">
 
 <!-- Model ImageField - Custom: 106px genişlik, kalite 85 -->
 <img src="{{ product.image|resim_optimize:'106:85' }}" alt="Ürün">
+
+<!-- Sadece genişlik: kalite varsayılan (100) kalır -->
+<img src="{{ product.image|resim_optimize:'200:' }}" alt="Ürün">
+
+<!-- Sadece kalite: genişlik orijinal boyutta kalır, resize yapılmaz -->
+<img src="{{ product.image|resim_optimize:':90' }}" alt="Ürün">
 
 <!-- Static dosya -->
 <img src="{{ 'images/logo.png'|resim_optimize:'200:90' }}" alt="Logo">
@@ -321,10 +327,10 @@ Template'de görüntülenecek resimleri dinamik olarak optimize eder. **Hem Mode
 {% endwith %}
 ```
 
-**Format:** `genişlik:kalite`
+**Format:** `genişlik:kalite` (ikisi de opsiyonel)
 
-- **genişlik** = Piksel cinsinden (varsayılan: 2000)
-- **kalite** = 0-100 arasında (varsayılan: 85)
+- **genişlik** = Piksel cinsinden (varsayılan: 2000, boş bırakılırsa orijinal boyut korunur, resize yapılmaz)
+- **kalite** = 0-100 arasında (varsayılan: 100)
 
 **Console çıktısı (Debug):**
 
@@ -333,6 +339,37 @@ Template'de görüntülenecek resimleri dinamik olarak optimize eder. **Hem Mode
 ✓ Resim: urunler/urun2.jpg | İstenen: 200x90 | Orijinal: (1500, 1500) | Sonuç: 28.67KB
 ✓ Resim: images/logo.png | İstenen: 200x90 | Orijinal: (800, 600) | Sonuç: 8.12KB
 ```
+
+---
+
+#### Nginx Arkasında Kullanım (Production)
+
+`resim_optimize`'nin ürettiği URL'ler gerçek bir dosya uzantısıyla biter (örn. `/optimize/genislik=2000/kalite=85/hero_resimler/bg-img-4-2.webp`). Nginx'in önünde, statik dosyaları uzantıya göre yakalayıp cache header'ı ekleyen tipik bir location bloğu varsa:
+
+```nginx
+location ~* ^.+\.(css|js|jpg|jpeg|gif|png|ico|webp|svg|woff2)$ {
+    expires max;
+}
+```
+
+bu blok `proxy_pass` içermediği için `/optimize/...` isteklerini de yakalar, diskte karşılığı olmayan bu "sanal" dosyayı bulamaz ve Django'ya hiç ulaşmadan **404** döner.
+
+**Çözüm:** Bu bloğa `try_files` ile proxy'ye düşen bir fallback ekleyin:
+
+```nginx
+location ~* ^.+\.(css|js|jpg|jpeg|gif|png|ico|webp|svg|woff2)$ {
+    expires max;
+    try_files $uri @proxy;
+}
+
+location @proxy {
+    proxy_pass http://unix:/path/to/gunicorn.sock;
+    proxy_set_header Host $host;
+    # ... diğer proxy_set_header'lar, mevcut location / bloğunuzla aynı
+}
+```
+
+Böylece gerçek static/media dosyaları eskisi gibi doğrudan nginx'ten hızlıca sunulur, `resim_optimize` gibi diskte fiziksel karşılığı olmayan dinamik uzantılı URL'ler otomatik olarak Django'ya proxy'lenir.
 
 ---
 
